@@ -1,19 +1,32 @@
-// Cubo axis-aligned sencillo para ray tracing básico.
-// Mantiene el estilo docente: claro, compacto y comentado.
 
 use crate::color::Vec3;
 use crate::material::Material;
-use crate::ray_intersect::{HitInfo, Ray, SceneObject};
+use crate::ray_intersect::{HitInfo, Ray, SceneObject, ObjectId};
 
 pub struct Cube {
     pub center: Vec3,
     pub half: f32,          // mitad del lado
     pub material: Material, // color y propiedades especulares
+    pub textured: bool,     // aplicar texturizado procedural de bloque de césped
 }
 
 impl Cube {
-    pub fn new(center: Vec3, side: f32, material: Material) -> Self {
-        Self { center, half: side * 0.5, material }
+    pub fn new(center: Vec3, side: f32, material: Material) -> Self { Self { center, half: side * 0.5, material, textured: false } }
+    pub fn new_textured(center: Vec3, side: f32, material: Material) -> Self { Self { center, half: side * 0.5, material, textured: true } }
+
+    // Calcula coordenadas UV en [0,1] para una posición sobre la superficie y normal axis-aligned.
+    // Mapeo simple: proyectar cada cara en su plano local.
+    pub fn face_uv(&self, position: Vec3, normal: Vec3) -> (f32, f32) {
+        let local = position - self.center;
+        let h = self.half;
+        let (u, v) = if normal.x.abs() > 0.9 { // caras +/-X: usar (z,y)
+            ((local.z / h + 1.0) * 0.5, (local.y / h + 1.0) * 0.5)
+        } else if normal.y.abs() > 0.9 { // caras +/-Y: usar (x,z)
+            ((local.x / h + 1.0) * 0.5, (local.z / h + 1.0) * 0.5)
+        } else { // caras +/-Z: usar (x,y)
+            ((local.x / h + 1.0) * 0.5, (local.y / h + 1.0) * 0.5)
+        };
+        (u.fract(), v.fract())
     }
 }
 
@@ -67,6 +80,7 @@ impl SceneObject for Cube {
             normal = Vec3::new(0.0, 1.0, 0.0);
         }
 
-        Some(HitInfo { t: t_hit, position, normal, material: self.material })
+    let (u, v) = self.face_uv(position, normal);
+    Some(HitInfo { t: t_hit, position, normal, material: self.material, object_id: ObjectId::Cube, u, v })
     }
 }

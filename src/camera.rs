@@ -11,7 +11,8 @@ pub struct OrbitCamera {
 
 impl OrbitCamera {
     pub fn new(target: Vec3, radius: f32) -> Self {
-        Self { target, radius, yaw: 0.6, pitch: 0.4 }
+        // yaw inicial desplazado y pitch más bajo para vista 3/4
+        Self { target, radius, yaw: 0.9, pitch: 0.25 }
     }
 
     pub fn handle_input(&mut self, rl: &mut RaylibHandle) {
@@ -23,7 +24,8 @@ impl OrbitCamera {
         self.pitch = self.pitch.clamp(-1.2, 1.2);
         if rl.is_key_down(KeyboardKey::KEY_Q) { self.radius *= 0.97; }
         if rl.is_key_down(KeyboardKey::KEY_E) { self.radius *= 1.03; }
-        self.radius = self.radius.clamp(1.5, 15.0);
+    // Aumentar el mínimo para no penetrar la isla (radio ~4)
+    self.radius = self.radius.clamp(5.0, 25.0);
     }
 
     pub fn position(&self) -> Vec3 {
