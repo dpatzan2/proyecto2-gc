@@ -82,8 +82,8 @@ pub fn build_island(world: &mut VoxelWorld, surface_mat: Material, trunk: Materi
     add_layer(world, leaf_base + 2, 3);
     world.add_voxel(tree_x, leaf_base + 3, tree_z, leaves);
     
-        // 4. Cubo de cofre justo a la par del árbol
-        let chest_x = tree_x + 1;e
+    // 4. Cubo de cofre justo a la par del árbol
+    let chest_x = tree_x + 1;
         let chest_y = base_y + 1;
         let chest_z = tree_z;
         let chest_mat = Material::new_basic(Color::new(1.0, 1.0, 1.0), 0.2, 12.0, MaterialKind::Stone); 
