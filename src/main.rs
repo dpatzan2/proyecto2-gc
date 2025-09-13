@@ -17,14 +17,14 @@ use light::PointLight;
 use material::{Material, MaterialKind};
 use ray_intersect::{Ray, SceneObject};
 
-use texture::{Textures, sample_grass_from_textures, sample_trunk_from_textures, sample_leaves_from_textures, sample_water_from_textures, sample_stone_from_textures};
+use texture::{Textures, sample_grass_from_textures, sample_trunk_from_textures, sample_leaves_from_textures, sample_water_from_textures, sample_stone_from_textures, LoadedTexture, load_png};
 use voxel_world::VoxelWorld;
 use island::{build_island, IslandParams};
 
 
 use skybox::Skybox;
 use framebuffer::RLFramebuffer;
-use rand::prelude::*; // updated for rand 0.9 API (rng, random_range, random_bool)
+use rand::prelude::*; 
 
 const WIDTH: i32 = 800;
 const HEIGHT: i32 = 600;
@@ -32,7 +32,7 @@ const RENDER_SCALE: f32 = 1.0;
 const MAX_DEPTH: i32 = 4;
 
 // --- Trazador recursivo con reflexión y refracción simples ---
-fn trace(ray: Ray, world: &VoxelWorld, depth: i32, sun_dir: color::Vec3, sky: &Skybox, tex: &Textures) -> Color {
+fn trace(ray: Ray, world: &VoxelWorld, depth: i32, sun_dir: color::Vec3, sky: &Skybox, tex: &Textures, chest_front: &LoadedTexture, chest_side: &LoadedTexture) -> Color {
     if depth <= 0 { return Color::black(); }
     let mut closest: Option<ray_intersect::HitInfo> = None;
     if let Some(h) = world.intersect(&ray) { closest = Some(h); }
@@ -71,22 +71,42 @@ fn trace(ray: Ray, world: &VoxelWorld, depth: i32, sun_dir: color::Vec3, sky: &S
             let t2 = hit.normal.cross(t1).normalized();
             let ripple = (t1 * ang.cos() + t2 * ang.sin()) * amp;
             water_normal = (hit.normal + ripple).normalized();
-            // Muestrear textura de agua (u,v simples) y mezclar leve con color base para intensidad
+       
             let tex_col = sample_water_from_textures(hit.u, hit.v, tex);
             let up_factor = hit.normal.y.max(0.0);
             base_col = (tex_col * (0.6 + 0.3*up_factor) + base_col * 0.3).clamped();
         }
     if hit.object_id == ray_intersect::ObjectId::Cube && hit.material.kind != MaterialKind::Glass {
-            let center_pos = hit.position - hit.normal * 0.5;
-            let vx = center_pos.x.round() as i32; let vy = center_pos.y.round() as i32; let vz = center_pos.z.round() as i32;
-            match hit.material.kind {
-                MaterialKind::Terrain => { let exposed = world.is_top_exposed(vx, vy, vz); base_col = sample_grass_from_textures(hit.normal, hit.u, hit.v, tex, exposed); },
-                MaterialKind::Trunk => { base_col = sample_trunk_from_textures(hit.normal, hit.u, hit.v, tex); },
-                MaterialKind::Leaves => { base_col = sample_leaves_from_textures(hit.u, hit.v, tex); },
-                MaterialKind::Stone => { base_col = sample_stone_from_textures(hit.u, hit.v, tex); },
-                _ => {}
-            }
+        let center_pos = hit.position - hit.normal * 0.5;
+        let vx = center_pos.x.round() as i32; let vy = center_pos.y.round() as i32; let vz = center_pos.z.round() as i32;
+        match hit.material.kind {
+            MaterialKind::Terrain => { let exposed = world.is_top_exposed(vx, vy, vz); base_col = sample_grass_from_textures(hit.normal, hit.u, hit.v, tex, exposed); },
+            MaterialKind::Trunk => { base_col = sample_trunk_from_textures(hit.normal, hit.u, hit.v, tex); },
+            MaterialKind::Leaves => { base_col = sample_leaves_from_textures(hit.u, hit.v, tex); },
+            MaterialKind::Stone => {
+                const CHEST_POS: (i32,i32,i32) = (-1, 7, 1); // (x,y,z)
+                if (vx, vy, vz) == CHEST_POS {
+                    let n = hit.normal;
+                    // Normalizamos u,v en 0..1 y volteamos V globalmente (estaban de cabeza)
+                    let mut u = hit.u.fract(); if u < 0.0 { u += 1.0; }
+                    let mut v = hit.v.fract(); if v < 0.0 { v += 1.0; }
+                    v = 1.0 - v; // corregir flip vertical
+                    // Ajustes horizontales para mantener coherencia lateral
+                    if n.x > 0.5 { u = 1.0 - u; } // cara derecha
+                    if n.z > 0.5 { u = 1.0 - u; } // cara trasera
+                    // Seleccionar textura frontal o lateral
+                    if n.z < -0.5 { // frente con manija
+                        base_col = chest_front.sample(u, v);
+                    } else {
+                        base_col = chest_side.sample(u, v);
+                    }
+                } else {
+                    base_col = sample_stone_from_textures(hit.u, hit.v, tex);
+                }
+            },
+            _ => {}
         }
+    }
         // Reflexión / Refracción
     let mut refl_col = Color::black();
     let mut refr_col = Color::black();
@@ -94,7 +114,7 @@ fn trace(ray: Ray, world: &VoxelWorld, depth: i32, sun_dir: color::Vec3, sky: &S
         if hit.material.reflectivity > 0.01 {
             let rdir = (ray.dir - n * 2.0 * ray.dir.dot(n)).normalized();
             let r_origin = hit.position + rdir * EPS * 6.0;
-            refl_col = trace(Ray { origin: r_origin, dir: rdir }, world, depth - 1, sun_dir, sky, tex);
+            refl_col = trace(Ray { origin: r_origin, dir: rdir }, world, depth - 1, sun_dir, sky, tex, chest_front, chest_side);
         }
         if hit.material.transparency > 0.01 {
             let mut n1 = 1.0; let mut n2 = hit.material.ior;
@@ -124,7 +144,7 @@ fn trace(ray: Ray, world: &VoxelWorld, depth: i32, sun_dir: color::Vec3, sky: &S
                             } else {
                      
                                 current_origin = h2.position + refr_dir * EPS * 2.0;
-                                final_col = trace(Ray{origin: current_origin, dir: refr_dir}, world, depth - 1, sun_dir, sky, tex);
+                                final_col = trace(Ray{origin: current_origin, dir: refr_dir}, world, depth - 1, sun_dir, sky, tex, chest_front, chest_side);
                                 hit_solid = true;
                                 break;
                             }
@@ -139,14 +159,14 @@ fn trace(ray: Ray, world: &VoxelWorld, depth: i32, sun_dir: color::Vec3, sky: &S
                     if !hit_solid {
                         let down = color::Vec3::new(0.0, -1.0, 0.0);
                         if let Some(_h3) = world.intersect(&Ray{ origin: current_origin, dir: down }) {
-                            final_col = trace(Ray{ origin: current_origin, dir: down }, world, depth - 1, sun_dir, sky, tex);
+                            final_col = trace(Ray{ origin: current_origin, dir: down }, world, depth - 1, sun_dir, sky, tex, chest_front, chest_side);
                         }
                     }
                     let depth_factor = (steps as f32 * 0.16).min(1.0);
                     let absorption = Color::new(0.02,0.04,0.08) * depth_factor * 0.7;
                     refr_col = (final_col * (1.0 - 0.45*depth_factor) + absorption).clamped();
                 } else {
-                    refr_col = trace(Ray { origin: r_origin, dir: refr_dir }, world, depth - 1, sun_dir, sky, tex);
+                    refr_col = trace(Ray { origin: r_origin, dir: refr_dir }, world, depth - 1, sun_dir, sky, tex, chest_front, chest_side);
                 }
             }
             if hit.material.reflectivity < 0.01 {
@@ -157,7 +177,7 @@ fn trace(ray: Ray, world: &VoxelWorld, depth: i32, sun_dir: color::Vec3, sky: &S
                 if is_water {
                     let rdir = (ray.dir - n * 2.0 * ray.dir.dot(n)).normalized();
                     let r_origin = hit.position + rdir * EPS * 6.0;
-                    let surface_ref = trace(Ray { origin: r_origin, dir: rdir }, world, depth - 1, sun_dir, sky, tex);
+                    let surface_ref = trace(Ray { origin: r_origin, dir: rdir }, world, depth - 1, sun_dir, sky, tex, chest_front, chest_side);
                     refr_col = surface_ref * fresnel + refr_col * (1.0 - fresnel);
                     refr_col = surface_ref * fresnel + refr_col * (1.0 - fresnel);
                 } else {
@@ -180,8 +200,10 @@ fn trace(ray: Ray, world: &VoxelWorld, depth: i32, sun_dir: color::Vec3, sky: &S
 
 fn main() {
     let skybox = Skybox::new();
-    // Cargar texturas desde carpeta
+    
     let textures = Textures::load_folder("textures");
+    let chest_front_tex = load_png("textures/cofre-frontal.png");
+    let chest_side_tex = load_png("textures/cofre-lado.png");
 
 
     let (mut rl, thread) = raylib::init()
@@ -210,7 +232,7 @@ fn main() {
 
     const POND_CX: i32 = 3;
     const POND_CZ: i32 = -2;
-    const POND_R: i32 = 3;          // radio base
+    const POND_R: i32 = 3;        
     let water_surface_y = top_height - 1;
     let water_deep_y = top_height - 2;
 
@@ -222,7 +244,7 @@ fn main() {
 
     for x in (POND_CX-POND_R-2)..=(POND_CX+POND_R+2) { for z in (POND_CZ-POND_R-2)..=(POND_CZ+POND_R+2) {
         let dx = x - POND_CX; let dz = z - POND_CZ; let dist = ((dx*dx + dz*dz) as f32).sqrt();
-        let jitter = hash2(x, z) * 1.2 - 0.6; // -0.6..+0.6
+        let jitter = hash2(x, z) * 1.2 - 0.6; 
         let eff_r = POND_R as f32 + jitter;
         if dist <= eff_r { 
             world.remove_voxel(x, top_height, z);
@@ -248,24 +270,24 @@ fn main() {
         }
     }}
     world.recompute_exposed();
-    // Asegurar capa de terreno alrededor de agua (excepto superficie)
+
     world.enforce_water_border(dirt_grass_mat);
     let internal_w = (WIDTH as f32 * RENDER_SCALE) as u32;
     let internal_h = (HEIGHT as f32 * RENDER_SCALE) as u32;
     let mut fb = RLFramebuffer::new(internal_w, internal_h);
 
-    // Randomize initial sun azimuth and elevation for variation each run
+
     let mut rng = rand::rng();
     let mut sun_az: f32 = rng.random_range(-1.2_f32..1.2_f32);  
     let mut sun_el: f32 = rng.random_range(0.6_f32..1.2_f32);  
-    // Slight random initial camera orbit tweak
+  
     if rng.random_bool(0.5) { camera.orbit_delta(rng.random_range(-0.3..0.3), rng.random_range(-0.1..0.1)); }
 
     let src_w = fb.width();
     let src_h = fb.height();
     while !rl.window_should_close() {
 
-        let rot_speed = 1.0/30.0 * std::f32::consts::PI; 
+    let rot_speed = 1.0/30.0 * std::f32::consts::PI; 
     use raylib::prelude::KeyboardKey::*;
     if rl.is_key_down(KEY_LEFT) { camera.orbit_delta(-rot_speed, 0.0); }
     if rl.is_key_down(KEY_RIGHT) { camera.orbit_delta(rot_speed, 0.0); }
@@ -288,7 +310,7 @@ fn main() {
                 let u = x as f32 / (src_w - 1) as f32;
                 let v = y as f32 / (src_h - 1) as f32;
                 let ray = camera.generate_ray(u, v, aspect);
-                let col = trace(ray, &world, MAX_DEPTH, sun_dir, &skybox, &textures);
+                let col = trace(ray, &world, MAX_DEPTH, sun_dir, &skybox, &textures, &chest_front_tex, &chest_side_tex);
                 fb.set_pixel(x as u32, y as u32, col);
             }
         }

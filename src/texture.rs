@@ -29,7 +29,7 @@ pub struct Textures {
     pub water: LoadedTexture,
 }
 
-fn load_png(path: &str) -> LoadedTexture {
+pub fn load_png(path: &str) -> LoadedTexture {
     if !Path::new(path).exists() {
         eprintln!("[textures] missing file: {}", path);
         return LoadedTexture { w:1, h:1, data: vec![Color::new(1.0,0.0,1.0)] };
@@ -64,17 +64,14 @@ impl Textures {
     }
 }
 
-// Nuevos sample_* basados en imágenes
+
 pub fn sample_grass_from_textures(normal: crate::color::Vec3, u: f32, v: f32, tex: &Textures, is_top_exposed: bool) -> Color {
-    // Capa superior expuesta: cara +Y usa grass_top; caras laterales usan grass_side.
-    // Bloques enterrados o no expuestos: todo dirt.
     let ax = normal.x.abs(); let ay = normal.y.abs(); let az = normal.z.abs();
     if !is_top_exposed { return tex.dirt.sample(u,v); }
-    if ay >= ax && ay >= az { // cara vertical más alineada a Y
+    if ay >= ax && ay >= az { 
         if normal.y > 0.0 { tex.grass_top.sample(u,v) } else { tex.dirt.sample(u,v) }
     } else {
-        // lateral
-        // invertir v para corregir orientación vertical si textura estaba de cabeza
+      
         let v_flipped = 1.0 - v;
         tex.grass_side.sample(u, v_flipped)
     }
