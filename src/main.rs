@@ -24,6 +24,7 @@ use island::{build_island, IslandParams};
 
 use skybox::Skybox;
 use framebuffer::RLFramebuffer;
+use rand::Rng;
 
 const WIDTH: i32 = 800;
 const HEIGHT: i32 = 600;
@@ -97,7 +98,7 @@ fn trace(ray: Ray, world: &VoxelWorld, depth: i32, sun_dir: color::Vec3, sky: &S
             let mut n1 = 1.0; let mut n2 = hit.material.ior;
             let mut normal = n;
             let cos_i = -normal.dot(ray.dir).max(-1.0).min(1.0);
-            if cos_i < 0.0 { // dentro -> fuera
+            if cos_i < 0.0 { 
                 normal = -normal; n1 = hit.material.ior; n2 = 1.0;
             }
             let eta = n1 / n2;
@@ -247,8 +248,12 @@ fn main() {
     let internal_h = (HEIGHT as f32 * RENDER_SCALE) as u32;
     let mut fb = RLFramebuffer::new(internal_w, internal_h);
 
-    let mut sun_az: f32 = -0.8;  
-    let mut sun_el: f32 = 1.05;  
+    // Randomize initial sun azimuth and elevation for variation each run
+    let mut rng = rand::thread_rng();
+    let mut sun_az: f32 = rng.gen_range(-1.2_f32..1.2_f32);  
+    let mut sun_el: f32 = rng.gen_range(0.6_f32..1.2_f32);  
+    // Slight random initial camera orbit tweak
+    if rng.gen_bool(0.5) { camera.orbit_delta(rng.gen_range(-0.3..0.3), rng.gen_range(-0.1..0.1)); }
 
     let src_w = fb.width();
     let src_h = fb.height();
@@ -270,9 +275,8 @@ fn main() {
         let se = sun_el.sin();
         let sun_dir = color::Vec3::new( sun_az.cos() * ce, -se, sun_az.sin() * ce ).normalized();
 
-        // Recalcular frame
         let aspect = src_w as f32 / src_h as f32;
-        // Render secuencial
+
         for y in 0..src_h {
             for x in 0..src_w {
                 let u = x as f32 / (src_w - 1) as f32;

@@ -17,11 +17,11 @@ impl Cube {
     pub fn face_uv(&self, position: Vec3, normal: Vec3) -> (f32, f32) {
         let local = position - self.center;
         let h = self.half;
-        let (u, v) = if normal.x.abs() > 0.9 { // caras +/-X: usar (z,y)
+        let (u, v) = if normal.x.abs() > 0.9 { 
             ((local.z / h + 1.0) * 0.5, (local.y / h + 1.0) * 0.5)
-        } else if normal.y.abs() > 0.9 { // caras +/-Y: usar (x,z)
+        } else if normal.y.abs() > 0.9 { 
             ((local.x / h + 1.0) * 0.5, (local.z / h + 1.0) * 0.5)
-        } else { // caras +/-Z: usar (x,y)
+        } else { 
             ((local.x / h + 1.0) * 0.5, (local.y / h + 1.0) * 0.5)
         };
         (u.fract(), v.fract())
@@ -57,7 +57,7 @@ impl SceneObject for Cube {
         if tzmin > tmin { tmin = tzmin; }
         if tzmax < tmax { tmax = tzmax; }
 
-        // Seleccionar el primer impacto positivo
+  
         let t_hit = if tmin < 0.0 { tmax } else { tmin };
         if t_hit < 0.0 { return None; }
 
@@ -66,7 +66,7 @@ impl SceneObject for Cube {
 
       
         let bias = self.half - 1e-4; 
-    let mut normal = Vec3::new(0.0, 0.0, 0.0); // will select dominant axis below
+    let mut normal = Vec3::new(0.0, 0.0, 0.0); 
         if local.x.abs() > bias && local.x.abs() >= local.y.abs() && local.x.abs() >= local.z.abs() {
             normal = Vec3::new(local.x.signum(), 0.0, 0.0);
         } else if local.y.abs() > bias && local.y.abs() >= local.x.abs() && local.y.abs() >= local.z.abs() {
