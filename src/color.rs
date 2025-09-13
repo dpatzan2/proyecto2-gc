@@ -1,4 +1,3 @@
-use raylib::prelude::Color as RLColor;
 use std::ops::{Add, Mul, Sub};
 
 // --- Color -------------------------------------------------------------
@@ -21,14 +20,7 @@ impl Color {
             self.b.clamp(0.0, 1.0),
         )
     }
-    pub fn to_raylib(self) -> RLColor {
-        RLColor::new(
-            (self.r * 255.0) as u8,
-            (self.g * 255.0) as u8,
-            (self.b * 255.0) as u8,
-            255,
-        )
-    }
+    pub fn to_rgb8(self) -> [u8;3] { [(self.r * 255.0) as u8, (self.g * 255.0) as u8, (self.b * 255.0) as u8] }
 }
 
 impl Add for Color {

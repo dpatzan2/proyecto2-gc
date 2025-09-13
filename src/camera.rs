@@ -1,6 +1,5 @@
 use crate::color::Vec3;
 use crate::ray_intersect::Ray;
-use raylib::prelude::*;
 
 pub struct OrbitCamera {
     target: Vec3,
@@ -11,22 +10,18 @@ pub struct OrbitCamera {
 
 impl OrbitCamera {
     pub fn new(target: Vec3, radius: f32) -> Self {
-        // yaw inicial desplazado y pitch más bajo para vista 3/4
+       
         Self { target, radius, yaw: 0.9, pitch: 0.25 }
     }
 
-    pub fn handle_input(&mut self, rl: &mut RaylibHandle) {
-        let rot_speed = 1.2 * rl.get_frame_time();
-        if rl.is_key_down(KeyboardKey::KEY_LEFT) { self.yaw -= rot_speed; }
-        if rl.is_key_down(KeyboardKey::KEY_RIGHT) { self.yaw += rot_speed; }
-        if rl.is_key_down(KeyboardKey::KEY_UP) { self.pitch += rot_speed; }
-        if rl.is_key_down(KeyboardKey::KEY_DOWN) { self.pitch -= rot_speed; }
-        self.pitch = self.pitch.clamp(-1.2, 1.2);
-        if rl.is_key_down(KeyboardKey::KEY_Q) { self.radius *= 0.97; }
-        if rl.is_key_down(KeyboardKey::KEY_E) { self.radius *= 1.03; }
-    // Aumentar el mínimo para no penetrar la isla (radio ~4)
-    self.radius = self.radius.clamp(5.0, 25.0);
+    pub fn set_orbit(&mut self, yaw: f32, pitch: f32, radius: f32) {
+        self.yaw = yaw; self.pitch = pitch.clamp(-1.2, 1.2); self.radius = radius.clamp(5.0, 25.0);
     }
+    pub fn orbit_delta(&mut self, dyaw: f32, dpitch: f32) {
+        self.yaw += dyaw;
+        self.pitch = (self.pitch + dpitch).clamp(-1.2, 1.2);
+    }
+    pub fn zoom_mul(&mut self, factor: f32) { self.radius = (self.radius * factor).clamp(5.0, 25.0); }
 
     pub fn position(&self) -> Vec3 {
         let x = self.radius * self.yaw.cos() * self.pitch.cos();

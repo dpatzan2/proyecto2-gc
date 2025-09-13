@@ -1,16 +1,12 @@
-use crate::{voxel_world::VoxelWorld, material::{Material}};
+use crate::{voxel_world::VoxelWorld, material::Material};
 
-// Generador de isla estilo SkyWars (diorama):
-// - Plataforma superior relativamente plana
-// - Capas inferiores que se estrechan gradualmente con algún saliente y estalactitas cortas
-// - Solo se añaden voxels de un único material; el shader ya decide césped vs tierra
-// - NO usa assets de Minecraft: forma y textura son procedurales
+
 
 pub struct IslandParams {
-    pub top_radius: i32,      // radio base de la plataforma superior
-    pub top_height: i32,      // altura y base de la capa superior
-    pub plateau_variation: i32, // variación de relieve (0-3)
-    pub depth: i32,           // número de capas de tierra bajo la superficie
+    pub top_radius: i32,
+    pub top_height: i32,   
+    pub plateau_variation: i32, 
+    pub depth: i32,           
 }
 
 impl Default for IslandParams {
@@ -25,14 +21,14 @@ fn hash2(x: i32, y: i32) -> f32 {
     ((h ^ (h >> 16)) & 0xffff) as f32 / 65535.0
 }
 
-pub fn build_island(world: &mut VoxelWorld, mat: Material, trunk: Material, leaves: Material, params: IslandParams) {
+pub fn build_island(world: &mut VoxelWorld, surface_mat: Material, trunk: Material, leaves: Material, stone_mat: Material, params: IslandParams) {
     let pr = params.top_radius;
     let h_top = params.top_height;
 
     // 1. Plataforma superior (plana si variation=0, ligera irregular si >0)
     if params.plateau_variation == 0 {
         for x in -pr..=pr { for z in -pr..=pr {
-            if (x*x + z*z) as f32 <= (pr as f32 + 0.05).powi(2) { world.add_voxel(x, h_top, z, mat); }
+            if (x*x + z*z) as f32 <= (pr as f32 + 0.05).powi(2) { world.add_voxel(x, h_top, z, surface_mat); }
         }}
     } else {
         for x in -pr..=pr { for z in -pr..=pr {
@@ -40,7 +36,7 @@ pub fn build_island(world: &mut VoxelWorld, mat: Material, trunk: Material, leav
             if r_norm <= 1.04 {
                 let n = hash2(x, z);
                 let local_bump = (n * params.plateau_variation as f32).floor() as i32; // 0..variation
-                world.add_voxel(x, h_top + local_bump, z, mat);
+                world.add_voxel(x, h_top + local_bump, z, surface_mat);
             }
         }}
     }
@@ -55,9 +51,11 @@ pub fn build_island(world: &mut VoxelWorld, mat: Material, trunk: Material, leav
             if rr as f32 <= (r_layer as f32 + 0.25).powi(2) {
                 let edge_noise = hash2(x + layer, z - layer);
                 if rr as f32 > (r_layer as f32 - 1.0).powi(2) && edge_noise > 0.78 { continue; }
-                world.add_voxel(x, y, z, mat);
+    
+                let chosen = if layer >= 3 { stone_mat } else { surface_mat };
+                world.add_voxel(x, y, z, chosen);
                 if layer == params.depth && edge_noise > 0.84 { // pequeñas estalactitas
-                    for extra in 1..=2 { world.add_voxel(x, y - extra, z, mat); }
+                    for extra in 1..=2 { world.add_voxel(x, y - extra, z, stone_mat); }
                 }
             }
         }}

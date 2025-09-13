@@ -5,4 +5,7 @@ edition = "2024"
 
 [dependencies]
 raylib = "5.5.1"
-rayon = "1.10"
+
+[features]
+default = []
+raylib_mode = []

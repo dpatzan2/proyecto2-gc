@@ -5,17 +5,15 @@ use crate::ray_intersect::{HitInfo, Ray, SceneObject, ObjectId};
 
 pub struct Cube {
     pub center: Vec3,
-    pub half: f32,          // mitad del lado
-    pub material: Material, // color y propiedades especulares
-    pub textured: bool,     // aplicar texturizado procedural de bloque de césped
+    pub half: f32,          
+    pub material: Material, 
+    pub textured: bool,     
 }
 
 impl Cube {
     pub fn new(center: Vec3, side: f32, material: Material) -> Self { Self { center, half: side * 0.5, material, textured: false } }
     pub fn new_textured(center: Vec3, side: f32, material: Material) -> Self { Self { center, half: side * 0.5, material, textured: true } }
 
-    // Calcula coordenadas UV en [0,1] para una posición sobre la superficie y normal axis-aligned.
-    // Mapeo simple: proyectar cada cara en su plano local.
     pub fn face_uv(&self, position: Vec3, normal: Vec3) -> (f32, f32) {
         let local = position - self.center;
         let h = self.half;
@@ -32,11 +30,11 @@ impl Cube {
 
 impl SceneObject for Cube {
     fn intersect(&self, ray: &Ray) -> Option<HitInfo> {
-        // Extremos del AABB
+
         let min = self.center - Vec3::new(self.half, self.half, self.half);
         let max = self.center + Vec3::new(self.half, self.half, self.half);
 
-        // Slab method (rápido y estable mientras dir != 0)
+     
         let inv = Vec3::new(1.0 / ray.dir.x, 1.0 / ray.dir.y, 1.0 / ray.dir.z);
 
         let mut tmin = (min.x - ray.origin.x) * inv.x;
@@ -66,9 +64,9 @@ impl SceneObject for Cube {
         let position = ray.origin + ray.dir * t_hit;
         let local = position - self.center;
 
-        // Determinar la cara golpeada: la componente más cercana al borde define la normal
-        let bias = self.half - 1e-4; // tolerancia para decidir
-        let mut normal = Vec3::new(0.0, 0.0, 0.0);
+      
+        let bias = self.half - 1e-4; 
+    let mut normal = Vec3::new(0.0, 0.0, 0.0); // will select dominant axis below
         if local.x.abs() > bias && local.x.abs() >= local.y.abs() && local.x.abs() >= local.z.abs() {
             normal = Vec3::new(local.x.signum(), 0.0, 0.0);
         } else if local.y.abs() > bias && local.y.abs() >= local.x.abs() && local.y.abs() >= local.z.abs() {
@@ -76,7 +74,7 @@ impl SceneObject for Cube {
         } else if local.z.abs() > bias && local.z.abs() >= local.x.abs() && local.z.abs() >= local.y.abs() {
             normal = Vec3::new(0.0, 0.0, local.z.signum());
         } else {
-            // Centro o error numérico: fallback (raro)
+     
             normal = Vec3::new(0.0, 1.0, 0.0);
         }
 

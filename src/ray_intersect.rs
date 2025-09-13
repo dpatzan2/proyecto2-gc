@@ -1,7 +1,6 @@
 use crate::color::Vec3;
 use crate::material::Material;
 
-// Identificador simple del objeto impactado para aplicar lógica específica (texturas, etc.).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ObjectId { Cube, Plane }
 
