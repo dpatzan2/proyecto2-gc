@@ -1,264 +1,86 @@
 
 use crate::color::Color;
+use std::path::Path;
 
-// Hash determinista 2D -> [0,1] - mejorado para mejor distribución
-fn hash2(x: i32, y: i32) -> f32 {
-    let mut h = x.wrapping_mul(374761393) ^ y.wrapping_mul(668265263);
-    h = (h ^ (h >> 13)).wrapping_mul(1274126177);
-    h = h ^ (h >> 16);
-    ((h & 0xffff) as f32) / 65535.0
+pub struct LoadedTexture {
+    pub w: u32,
+    pub h: u32,
+    pub data: Vec<Color>,
 }
 
-// Función para crear patrones de píxeles discretos (estilo Minecraft)
-fn pixelated_noise(u: f32, v: f32, scale: i32) -> f32 {
-    let x = (u * scale as f32).floor() as i32;
-    let y = (v * scale as f32).floor() as i32;
-    hash2(x, y)
-}
-
-// Función para mezclar colores de manera más realista
-fn blend_colors(base: Color, overlay: Color, factor: f32) -> Color {
-    Color::new(
-        base.r * (1.0 - factor) + overlay.r * factor,
-        base.g * (1.0 - factor) + overlay.g * factor,
-        base.b * (1.0 - factor) + overlay.b * factor,
-    )
-}
-
-// Césped (top): Verde vibrante con patrón de píxeles como Minecraft
-pub fn sample_grass_top(u: f32, v: f32) -> Color {
-    
-    let pixel_u = (u * 16.0).floor() / 16.0;
-    let pixel_v = (v * 16.0).floor() / 16.0;
-    
-    let noise1 = pixelated_noise(pixel_u, pixel_v, 16);
-    let noise2 = pixelated_noise(pixel_u * 2.0, pixel_v * 2.0, 32);
-    
-
-    let base_green = Color::new(0.486, 0.733, 0.216); 
-    let dark_green = Color::new(0.357, 0.565, 0.153);   
-    let light_green = Color::new(0.565, 0.824, 0.259);  
- 
-    let mut result = base_green;
-    if noise1 > 0.6 {
-        result = blend_colors(result, dark_green, 0.4);
-    } else if noise1 < 0.3 {
-        result = blend_colors(result, light_green, 0.3);
+impl LoadedTexture {
+    pub fn sample(&self, u: f32, v: f32) -> Color {
+    if self.w == 0 || self.h == 0 { return Color::new(1.0,0.0,1.0); }
+        let mut uu = u.fract(); if uu < 0.0 { uu += 1.0; }
+        let mut vv = v.fract(); if vv < 0.0 { vv += 1.0; }
+        let x = (uu * (self.w - 1) as f32).clamp(0.0, (self.w - 1) as f32) as u32;
+        let y = (vv * (self.h - 1) as f32).clamp(0.0, (self.h - 1) as f32) as u32;
+        self.data[(y * self.w + x) as usize]
     }
-    
-   
-    if noise2 > 0.7 {
-        result = blend_colors(result, dark_green, 0.2);
-    }
-    
-    result.clamped()
 }
 
-// Tierra (bottom): Marrón con textura granular como Minecraft
-pub fn sample_dirt(u: f32, v: f32) -> Color {
-    let pixel_u = (u * 16.0).floor() / 16.0;
-    let pixel_v = (v * 16.0).floor() / 16.0;
-    
-    let noise1 = pixelated_noise(pixel_u, pixel_v, 16);
-    let noise2 = pixelated_noise(pixel_u * 1.5, pixel_v * 1.5, 24);
-    
-   
-    let base_brown = Color::new(0.545, 0.396, 0.282);
-    let dark_brown = Color::new(0.463, 0.318, 0.208);
-    let light_brown = Color::new(0.627, 0.475, 0.357);
-    let reddish = Color::new(0.592, 0.384, 0.255);
-
-    let mut result = base_brown;
-    
-
-    if noise1 > 0.65 {
-        result = blend_colors(result, dark_brown, 0.5);
-    } else if noise1 < 0.25 {
-        result = blend_colors(result, light_brown, 0.4);
-    } else if noise1 > 0.45 && noise1 < 0.55 {
-        result = blend_colors(result, reddish, 0.3);
-    }
-    
-
-    if noise2 > 0.8 {
-        result = blend_colors(result, dark_brown, 0.15);
-    }
-    
-    result.clamped()
+pub struct Textures {
+    pub grass_top: LoadedTexture,
+    pub grass_side: LoadedTexture,
+    pub dirt: LoadedTexture,
+    pub trunk: LoadedTexture,
+    pub leaves: LoadedTexture,
+    pub stone: LoadedTexture,
+    pub water: LoadedTexture,
 }
 
-
-pub fn sample_grass_side(u: f32, v: f32) -> Color {
-    let pixel_u = (u * 16.0).floor() / 16.0;
-    let pixel_v = (v * 16.0).floor() / 16.0;
-    
-  
-    let grass_height = 0.8;
-    
-    if v > grass_height {
-
-        let noise = pixelated_noise(pixel_u, pixel_v, 16);
-        let base_green = Color::new(0.357, 0.565, 0.153);
-        let dark_green = Color::new(0.278, 0.463, 0.118);
-        
-        if noise > 0.5 {
-            blend_colors(base_green, dark_green, 0.3)
-        } else {
-            base_green
+fn load_png(path: &str) -> LoadedTexture {
+    if !Path::new(path).exists() {
+        eprintln!("[textures] missing file: {}", path);
+        return LoadedTexture { w:1, h:1, data: vec![Color::new(1.0,0.0,1.0)] };
+    }
+    match image::open(path) {
+        Ok(img_any) => {
+            let img = img_any.to_rgba8();
+            let (w,h) = img.dimensions();
+            let mut data = Vec::with_capacity((w*h) as usize);
+            for p in img.pixels() { let [r,g,b,_a] = p.0; data.push(Color::new(r as f32/255.0, g as f32/255.0, b as f32/255.0)); }
+            eprintln!("[textures] loaded {} ({}x{})", path, w, h);
+            LoadedTexture { w, h, data }
         }
+        Err(err) => {
+            eprintln!("[textures] error loading {}: {}", path, err);
+            LoadedTexture { w:1, h:1, data: vec![Color::new(1.0,0.0,1.0)] }
+        }
+    }
+}
+
+impl Textures {
+    pub fn load_folder(folder: &str) -> Self {
+        Self {
+            grass_top: load_png(&format!("{}/arriba-cesped.png", folder)),
+            grass_side: load_png(&format!("{}/cesped.png", folder)),
+            dirt: load_png(&format!("{}/tierra.png", folder)),
+            trunk: load_png(&format!("{}/tronco.png", folder)),
+            leaves: load_png(&format!("{}/hojas.png", folder)),
+            stone: load_png(&format!("{}/stone.png", folder)),
+            water: load_png(&format!("{}/agua.png", folder)),
+        }
+    }
+}
+
+// Nuevos sample_* basados en imágenes
+pub fn sample_grass_from_textures(normal: crate::color::Vec3, u: f32, v: f32, tex: &Textures, is_top_exposed: bool) -> Color {
+    // Capa superior expuesta: cara +Y usa grass_top; caras laterales usan grass_side.
+    // Bloques enterrados o no expuestos: todo dirt.
+    let ax = normal.x.abs(); let ay = normal.y.abs(); let az = normal.z.abs();
+    if !is_top_exposed { return tex.dirt.sample(u,v); }
+    if ay >= ax && ay >= az { // cara vertical más alineada a Y
+        if normal.y > 0.0 { tex.grass_top.sample(u,v) } else { tex.dirt.sample(u,v) }
     } else {
-      
-        sample_dirt(pixel_u, pixel_v * 1.2)
+        // lateral
+        // invertir v para corregir orientación vertical si textura estaba de cabeza
+        let v_flipped = 1.0 - v;
+        tex.grass_side.sample(u, v_flipped)
     }
 }
 
-// Función principal para bloques de césped
-pub fn sample_grass_block(normal: crate::color::Vec3, u: f32, v: f32) -> Color {
-    let ax = normal.x.abs();
-    let ay = normal.y.abs();
-    let az = normal.z.abs();
-    
-    if ay >= ax && ay >= az { 
-        if normal.y > 0.0 { 
-            sample_grass_top(u, v) 
-        } else { 
-            sample_dirt(u, v) 
-        }
-    } else { // caras laterales
-        sample_grass_side(u, v)
-    }
-}
-
-// Versión con exposición al aire
-pub fn sample_grass_block_surface(normal: crate::color::Vec3, u: f32, v: f32, is_top_exposed: bool) -> Color {
-    if !is_top_exposed { 
-        return sample_dirt(u, v); 
-    }
-    sample_grass_block(normal, u, v)
-}
-
-
-pub fn sample_trunk(normal: crate::color::Vec3, u: f32, v: f32) -> Color {
-    let ax = normal.x.abs();
-    let ay = normal.y.abs(); 
-    let az = normal.z.abs();
-    
-    if ay >= ax && ay >= az {
-        let pixel_u = (u * 16.0).floor() / 16.0;
-        let pixel_v = (v * 16.0).floor() / 16.0;
-        
-  
-        let center_u = 0.5;
-        let center_v = 0.5;
-        let dist = ((u - center_u) * (u - center_u) + (v - center_v) * (v - center_v)).sqrt();
-        
-        let noise = pixelated_noise(pixel_u, pixel_v, 16);
-        
-     
-        let light_wood = Color::new(0.686, 0.573, 0.427);  
-        let medium_wood = Color::new(0.588, 0.478, 0.337); 
-        let dark_wood = Color::new(0.478, 0.384, 0.267);   
-        
-
-        let ring_factor = (dist * 8.0).sin() * 0.5 + 0.5;
-        let mut result = blend_colors(medium_wood, light_wood, ring_factor * 0.3);
-
-        if noise > 0.7 {
-            result = blend_colors(result, dark_wood, 0.3);
-        } else if noise < 0.3 {
-            result = blend_colors(result, light_wood, 0.2);
-        }
-        
-        result.clamped()
-    } else {
-        let pixel_u = (u * 16.0).floor() / 16.0;
-        let pixel_v = (v * 16.0).floor() / 16.0;
-        
-        let noise1 = pixelated_noise(pixel_u, pixel_v, 16);
-        let noise2 = pixelated_noise(pixel_u * 0.5, pixel_v * 2.0, 12);
-        
-
-        let base_bark = Color::new(0.427, 0.337, 0.227);
-        let dark_bark = Color::new(0.318, 0.247, 0.157);
-        let light_bark = Color::new(0.537, 0.427, 0.298);
-
-        let mut result = base_bark;
-        
-  
-        if noise2 > 0.6 {
-            result = blend_colors(result, dark_bark, 0.4);
-        }
-     
-        if noise1 > 0.75 {
-            result = blend_colors(result, dark_bark, 0.3);
-        } else if noise1 < 0.25 {
-            result = blend_colors(result, light_bark, 0.2);
-        }
-        
-        result.clamped()
-    }
-}
-
-// Hojas de roble - verde más natural con transparencia simulada
-pub fn sample_leaves(u: f32, v: f32) -> Color {
-    let pixel_u = (u * 16.0).floor() / 16.0;
-    let pixel_v = (v * 16.0).floor() / 16.0;
-    
-    let noise1 = pixelated_noise(pixel_u, pixel_v, 16);
-    let noise2 = pixelated_noise(pixel_u * 1.3, pixel_v * 1.7, 20);
-    
-
-    let base_leaf = Color::new(0.298, 0.627, 0.216);    
-    let dark_leaf = Color::new(0.208, 0.478, 0.145);    
-    let light_leaf = Color::new(0.388, 0.714, 0.278);   
-    let yellow_tint = Color::new(0.506, 0.667, 0.247);  
-    
-    let mut result = base_leaf;
-    
-
-    if noise1 > 0.7 {
-        result = blend_colors(result, dark_leaf, 0.4);
-    } else if noise1 < 0.2 {
-        result = blend_colors(result, light_leaf, 0.3);
-    } else if noise1 > 0.4 && noise1 < 0.6 {
-        result = blend_colors(result, yellow_tint, 0.2);
-    }
-    
-
-    if noise2 > 0.8 {
-        result = blend_colors(result, dark_leaf, 0.2);
-    }
-    
-    result.clamped()
-}
-
-// Stone 
-pub fn sample_stone(u: f32, v: f32) -> Color {
-    let pixel_u = (u * 16.0).floor() / 16.0;
-    let pixel_v = (v * 16.0).floor() / 16.0;
-    
-    let noise1 = pixelated_noise(pixel_u, pixel_v, 16);
-    let noise2 = pixelated_noise(pixel_u * 1.5, pixel_v * 1.5, 24);
-    
-
-    let base_stone = Color::new(0.502, 0.502, 0.502);    
-    let dark_stone = Color::new(0.392, 0.392, 0.392);    
-    let light_stone = Color::new(0.612, 0.612, 0.612);   
-    
-    let mut result = base_stone;
-    
-    if noise1 > 0.65 {
-        result = blend_colors(result, dark_stone, 0.4);
-    } else if noise1 < 0.3 {
-        result = blend_colors(result, light_stone, 0.3);
-    }
-    
-    if noise2 > 0.8 {
-        result = blend_colors(result, dark_stone, 0.15);
-    }
-    
-    result.clamped()
-}
-
-
-pub struct Texture;
+pub fn sample_trunk_from_textures(_normal: crate::color::Vec3, u: f32, v: f32, tex: &Textures) -> Color { tex.trunk.sample(u,v) }
+pub fn sample_leaves_from_textures(u: f32, v: f32, tex: &Textures) -> Color { tex.leaves.sample(u,v) }
+pub fn sample_stone_from_textures(u: f32, v: f32, tex: &Textures) -> Color { tex.stone.sample(u,v) }
+pub fn sample_water_from_textures(u: f32, v: f32, tex: &Textures) -> Color { tex.water.sample(u,v) }

@@ -31,6 +31,25 @@ impl VoxelWorld {
         }
     }
     pub fn is_top_exposed(&self, x:i32,y:i32,z:i32) -> bool { self.exposed.contains(&(x,y,z)) }
+    // Asegura que cada voxel de agua (excepto su cara superior) esté rodeado lateralmente y por debajo
+    // por terreno (dirt/grass material). No modifica la superficie libre (cara +Y).
+    pub fn enforce_water_border(&mut self, terrain_mat: Material) {
+        // recopilar posiciones de agua primero para evitar mutación durante iteración
+        let water_positions: Vec<(i32,i32,i32)> = self.voxels.iter()
+            .filter(|(_k, m)| m.kind == MaterialKind::Water)
+            .map(|(k,_m)| *k).collect();
+        for (x,y,z) in water_positions {
+            // abajo
+            if !self.has_voxel(x, y-1, z) { self.add_voxel(x, y-1, z, terrain_mat); }
+            // laterales (4-neigh)
+            if !self.has_voxel(x+1,y,z) { self.add_voxel(x+1,y,z, terrain_mat); }
+            if !self.has_voxel(x-1,y,z) { self.add_voxel(x-1,y,z, terrain_mat); }
+            if !self.has_voxel(x,y,z+1) { self.add_voxel(x,y,z+1, terrain_mat); }
+            if !self.has_voxel(x,y,z-1) { self.add_voxel(x,y,z-1, terrain_mat); }
+        }
+        // recomputar expuestos porque añadimos bloques
+        self.recompute_exposed();
+    }
     fn aabb_bounds(&self) -> (Vec3, Vec3) {
         if self.voxels.is_empty() { return (Vec3::new(0.0,0.0,0.0), Vec3::new(0.0,0.0,0.0)); }
         let min = Vec3::new(self.min.0 as f32 -0.5, self.min.1 as f32 -0.5, self.min.2 as f32 -0.5);
