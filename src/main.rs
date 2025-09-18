@@ -37,6 +37,10 @@ fn trace(ray: Ray, world: &VoxelWorld, depth: i32, sun_dir: color::Vec3, sky: &S
     let mut closest: Option<ray_intersect::HitInfo> = None;
     if let Some(h) = world.intersect(&ray) { closest = Some(h); }
     if let Some(hit) = closest {
+        // Nubes: sin shading ni iluminación, color puro
+        if hit.material.kind == MaterialKind::Cloud {
+            return hit.material.color;
+        }
         const EPS: f32 = 4e-4;
         let light_dir = -sun_dir;
         let shadow_origin = hit.position + hit.normal * (EPS * 6.0) + light_dir * (EPS * 4.0);
@@ -103,6 +107,10 @@ fn trace(ray: Ray, world: &VoxelWorld, depth: i32, sun_dir: color::Vec3, sky: &S
                 } else {
                     base_col = sample_stone_from_textures(hit.u, hit.v, tex);
                 }
+            },
+            MaterialKind::Cloud => {
+                // Nubes: usar color puro, sin textura
+                base_col = hit.material.color;
             },
             _ => {}
         }

@@ -84,8 +84,61 @@ pub fn build_island(world: &mut VoxelWorld, surface_mat: Material, trunk: Materi
     
     // 4. Cubo de cofre justo a la par del árbol
     let chest_x = tree_x + 1;
-        let chest_y = base_y + 1;
-        let chest_z = tree_z;
-        let chest_mat = Material::new_basic(Color::new(1.0, 1.0, 1.0), 0.2, 12.0, MaterialKind::Stone); 
-        world.add_voxel(chest_x, chest_y, chest_z, chest_mat); 
+    let chest_y = base_y + 1;
+    let chest_z = tree_z;
+    let chest_mat = Material::new_basic(Color::new(1.0, 1.0, 1.0), 0.2, 12.0, MaterialKind::Stone); 
+    world.add_voxel(chest_x, chest_y, chest_z, chest_mat); 
+
+    // 5. Nubes físicas tipo Minecraft (cubos blancos dispersos y bajos)
+    let cloud_mat = Material::new_basic(Color::new(1.0, 1.0, 1.0), 0.05, 8.0, MaterialKind::Cloud);
+    let cloud_base_y = h_top + 24; 
+    let cloud_size_x = 12; 
+    let cloud_size_y = 1; 
+    let cloud_size_z = 5;  
+    let cloud_centers = vec![
+        (-10, cloud_base_y, 8),
+        (8, cloud_base_y, -7),
+        (0, cloud_base_y, 15),
+        (-12, cloud_base_y, -10),
+        (13, cloud_base_y, 3),
+    ];
+  
+    for (i, &(cx, cy, cz)) in cloud_centers.iter().enumerate() {
+   
+        for dx in -cloud_size_x/2..=cloud_size_x/2 {
+            let dy = 0;
+            for dz in -cloud_size_z/2..=cloud_size_z/2 {
+                world.add_voxel(cx+dx, cy+dy, cz+dz, cloud_mat);
+            }
+        }
+        //patrones
+        match i % 4 {
+            0 => { 
+                for dx in -cloud_size_x/2..=-cloud_size_x/4 {
+                    for dz in cloud_size_z/2+1..=cloud_size_z/2+3 {
+                        world.add_voxel(cx+dx, cy, cz+dz, cloud_mat);
+                    }
+                }
+            },
+            1 => { 
+                for dx in -2..=2 {
+                    for dz in -cloud_size_z/2-2..=-cloud_size_z/2 {
+                        world.add_voxel(cx+dx, cy, cz+dz, cloud_mat);
+                    }
+                }
+            },
+            2 => { 
+                for step in 0..4 {
+                    world.add_voxel(cx-step, cy, cz+step, cloud_mat);
+                }
+            },
+            3 => { 
+                for dz in -cloud_size_z/2-2..=cloud_size_z/2+2 {
+                    if dz.abs() > cloud_size_z/2 { world.add_voxel(cx, cy, cz+dz, cloud_mat); }
+                }
+            },
+            _ => {}
+        }
+    }
 }
+

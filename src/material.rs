@@ -8,6 +8,7 @@ pub enum MaterialKind {
 	Glass,  
 	Water,  
 	Stone,
+    Cloud, 
 }
 
 #[derive(Clone, Copy)]
@@ -35,4 +36,5 @@ impl Material {
 	pub fn new_stone(color: Color) -> Self {
 		Self { color, specular: 0.15, shininess: 18.0, kind: MaterialKind::Stone, reflectivity: 0.0, transparency: 0.0, ior: 1.0 }
 	}
+
 }
