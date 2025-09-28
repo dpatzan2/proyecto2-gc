@@ -31,23 +31,22 @@ impl VoxelWorld {
         }
     }
     pub fn is_top_exposed(&self, x:i32,y:i32,z:i32) -> bool { self.exposed.contains(&(x,y,z)) }
-    // Asegura que cada voxel de agua (excepto su cara superior) esté rodeado lateralmente y por debajo
-    // por terreno (dirt/grass material). No modifica la superficie libre (cara +Y).
+
     pub fn enforce_water_border(&mut self, terrain_mat: Material) {
-        // recopilar posiciones de agua primero para evitar mutación durante iteración
+
         let water_positions: Vec<(i32,i32,i32)> = self.voxels.iter()
             .filter(|(_k, m)| m.kind == MaterialKind::Water)
             .map(|(k,_m)| *k).collect();
         for (x,y,z) in water_positions {
             // abajo
             if !self.has_voxel(x, y-1, z) { self.add_voxel(x, y-1, z, terrain_mat); }
-            // laterales (4-neigh)
+      
             if !self.has_voxel(x+1,y,z) { self.add_voxel(x+1,y,z, terrain_mat); }
             if !self.has_voxel(x-1,y,z) { self.add_voxel(x-1,y,z, terrain_mat); }
             if !self.has_voxel(x,y,z+1) { self.add_voxel(x,y,z+1, terrain_mat); }
             if !self.has_voxel(x,y,z-1) { self.add_voxel(x,y,z-1, terrain_mat); }
         }
-        // recomputar expuestos porque añadimos bloques
+        
         self.recompute_exposed();
     }
     fn aabb_bounds(&self) -> (Vec3, Vec3) {
@@ -73,12 +72,12 @@ impl VoxelWorld {
         if tmin>tzmax || tzmin>tmax { return None; }
         if tzmin>tmin { tmin = tzmin; }
         if tzmax<tmax { tmax = tzmax; }
-        if tmax < 0.0 { return None; }
-        Some(if tmin<0.0 { tmax } else { tmin })
+    if tmax < 0.0 { return None; }
+    Some(tmin)
     }
     fn voxel_hit(&self, ix:i32,iy:i32,iz:i32, ray:&Ray) -> Option<HitInfo> {
         if let Some(mat) = self.voxels.get(&(ix,iy,iz)) {
-            // Intersección AABB del cubo
+           
             let min = Vec3::new(ix as f32 -0.5, iy as f32 -0.5, iz as f32 -0.5);
             let max = Vec3::new(ix as f32 +0.5, iy as f32 +0.5, iz as f32 +0.5);
             if let Some(t) = Self::ray_aabb(ray, min, max) {
@@ -106,7 +105,7 @@ impl VoxelWorld {
         None
     }
 
-    // Recorre el grid para comprobar si existe algún voxel en la dirección (dir) desde origin (saltando la celda inicial)
+
     pub fn occluded(&self, origin: Vec3, dir: Vec3, max_t: f32) -> bool {
         if self.voxels.is_empty() { return false; }
         let mut ix = (origin.x + 0.5).floor() as i32;
@@ -138,12 +137,17 @@ impl VoxelWorld {
             }
             if t_curr > max_t { break; }
             if ix < self.min.0-1 || ix > self.max.0+1 || iy < self.min.1-1 || iy > self.max.1+1 || iz < self.min.2-1 || iz > self.max.2+1 { break; }
-            if self.voxels.contains_key(&(ix,iy,iz)) { return true; }
+            if let Some(mat) = self.voxels.get(&(ix,iy,iz)) {
+        
+                if mat.kind != MaterialKind::Cloud {
+                    return true;
+                }
+            }
         }
         false
     }
 
-    // Igual que occluded pero ignorando voxels de agua para permitir iluminación bajo el agua
+  
     pub fn occluded_ignore_water(&self, origin: Vec3, dir: Vec3, max_t: f32) -> bool {
         if self.voxels.is_empty() { return false; }
         let mut ix = (origin.x + 0.5).floor() as i32;
@@ -175,7 +179,8 @@ impl VoxelWorld {
             if t_curr > max_t { break; }
             if ix < self.min.0-1 || ix > self.max.0+1 || iy < self.min.1-1 || iy > self.max.1+1 || iz < self.min.2-1 || iz > self.max.2+1 { break; }
             if let Some(mat) = self.voxels.get(&(ix,iy,iz)) {
-                if mat.kind != MaterialKind::Water { return true; }
+           
+                if mat.kind != MaterialKind::Water && mat.kind != MaterialKind::Cloud { return true; }
             }
         }
         false

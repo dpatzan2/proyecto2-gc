@@ -25,21 +25,22 @@ use island::{build_island, IslandParams};
 use skybox::Skybox;
 use framebuffer::RLFramebuffer;
 use rand::prelude::*; 
+use rayon::prelude::*;
 
 const WIDTH: i32 = 800;
 const HEIGHT: i32 = 600;
 const RENDER_SCALE: f32 = 1.0; 
 const MAX_DEPTH: i32 = 4;
 
-// --- Trazador recursivo con reflexión y refracción simples ---
+
 fn trace(ray: Ray, world: &VoxelWorld, depth: i32, sun_dir: color::Vec3, sky: &Skybox, tex: &Textures, chest_front: &LoadedTexture, chest_side: &LoadedTexture) -> Color {
     if depth <= 0 { return Color::black(); }
     let mut closest: Option<ray_intersect::HitInfo> = None;
     if let Some(h) = world.intersect(&ray) { closest = Some(h); }
     if let Some(hit) = closest {
-        // Nubes: sin shading ni iluminación, color puro
+     
         if hit.material.kind == MaterialKind::Cloud {
-            return hit.material.color;
+            return Color::white();
         }
         const EPS: f32 = 4e-4;
         let light_dir = -sun_dir;
@@ -91,15 +92,15 @@ fn trace(ray: Ray, world: &VoxelWorld, depth: i32, sun_dir: color::Vec3, sky: &S
                 const CHEST_POS: (i32,i32,i32) = (-1, 7, 1); // (x,y,z)
                 if (vx, vy, vz) == CHEST_POS {
                     let n = hit.normal;
-                    // Normalizamos u,v en 0..1 y volteamos V globalmente (estaban de cabeza)
+                    
                     let mut u = hit.u.fract(); if u < 0.0 { u += 1.0; }
                     let mut v = hit.v.fract(); if v < 0.0 { v += 1.0; }
-                    v = 1.0 - v; // corregir flip vertical
-                    // Ajustes horizontales para mantener coherencia lateral
-                    if n.x > 0.5 { u = 1.0 - u; } // cara derecha
-                    if n.z > 0.5 { u = 1.0 - u; } // cara trasera
-                    // Seleccionar textura frontal o lateral
-                    if n.z < -0.5 { // frente con manija
+                    v = 1.0 - v; 
+                  
+                    if n.x > 0.5 { u = 1.0 - u; } 
+                    if n.z > 0.5 { u = 1.0 - u; } 
+                
+                    if n.z < -0.5 { 
                         base_col = chest_front.sample(u, v);
                     } else {
                         base_col = chest_side.sample(u, v);
@@ -107,10 +108,6 @@ fn trace(ray: Ray, world: &VoxelWorld, depth: i32, sun_dir: color::Vec3, sky: &S
                 } else {
                     base_col = sample_stone_from_textures(hit.u, hit.v, tex);
                 }
-            },
-            MaterialKind::Cloud => {
-                // Nubes: usar color puro, sin textura
-                base_col = hit.material.color;
             },
             _ => {}
         }
@@ -313,15 +310,19 @@ fn main() {
 
         let aspect = src_w as f32 / src_h as f32;
 
-        for y in 0..src_h {
-            for x in 0..src_w {
-                let u = x as f32 / (src_w - 1) as f32;
-                let v = y as f32 / (src_h - 1) as f32;
-                let ray = camera.generate_ray(u, v, aspect);
-                let col = trace(ray, &world, MAX_DEPTH, sun_dir, &skybox, &textures, &chest_front_tex, &chest_side_tex);
-                fb.set_pixel(x as u32, y as u32, col);
-            }
-        }
+     
+        let mut pixels: Vec<Color> = vec![Color::black(); (src_w * src_h) as usize];
+        pixels.par_iter_mut().enumerate().for_each(|(i, px)| {
+            let x = (i as u32) % src_w;
+            let y = (i as u32) / src_w;
+            let u = x as f32 / (src_w - 1) as f32;
+            let v = y as f32 / (src_h - 1) as f32;
+            let ray = camera.generate_ray(u, v, aspect);
+            let col = trace(ray, &world, MAX_DEPTH, sun_dir, &skybox, &textures, &chest_front_tex, &chest_side_tex);
+            *px = col;
+        });
+   
+        fb.replace_buffer(pixels.iter().map(|c| *c).collect());
         if rl.is_key_pressed(KEY_P) { fb.save("render.png"); }
         fb.present(&mut rl, &thread);
     }
