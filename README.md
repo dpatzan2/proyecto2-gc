@@ -5,3 +5,22 @@
 ## Entrega 2
 <img width="776" height="596" alt="image" src="https://github.com/user-attachments/assets/3a8fa675-c743-42ea-88ad-de5f47f214d7" />
 
+## Entrega final (Isla de SkyBloc cuando inicias)
+
+<img width="790" height="595" alt="image" src="https://github.com/user-attachments/assets/7b5f516c-0257-4097-9798-c5e6f38388c9" />
+
+
+<img width="789" height="596" alt="image" src="https://github.com/user-attachments/assets/ddbcf27b-7505-49e2-942c-8a951a6d840c" />
+
+
+<img width="789" height="602" alt="image" src="https://github.com/user-attachments/assets/bc5febb0-12e4-4539-b2d9-59dc81988768" />
+
+
+<img width="796" height="597" alt="image" src="https://github.com/user-attachments/assets/37688759-c744-403c-8da3-1e27d4138516" />
+
+
+<img width="801" height="602" alt="image" src="https://github.com/user-attachments/assets/874340a0-fecf-4553-9c9f-c8fb1d376cb1" />
+
+
+<img width="793" height="591" alt="image" src="https://github.com/user-attachments/assets/cc40f29c-453c-4d9b-ba07-decaa7b16939" />
+
