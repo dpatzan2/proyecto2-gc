@@ -24,3 +24,17 @@
 
 <img width="793" height="591" alt="image" src="https://github.com/user-attachments/assets/cc40f29c-453c-4d9b-ba07-decaa7b16939" />
 
+
+## Controles 
+
+Usa el teclado para mover la cámara y ajustar la escena. Controles principales:
+
+- Flechas izquierda/derecha: rotar la cámara alrededor de la isla (orbit).
+- Flechas arriba/abajo: inclinar la cámara (subir/bajar ángulo).
+- Q / Z  : alejar la cámara (zoom out).
+- E / X  : acercar la cámara (zoom in).
+- J / L (o A / D): mover la posición aparente del sol horizontalmente (cambia la dirección del sol).
+- I / K (o W / S): cambiar la elevación del sol (más alto o más bajo).
+- P: guardar la imagen actual como `render.png`.
+
+
